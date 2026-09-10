@@ -1,0 +1,10 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CSV分割くん</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 18px;color:#172033}section{padding:24px;border:1px solid #d8deea;border-radius:14px}label{display:block;margin:14px 0 6px;font-weight:700}input,button{font:inherit;padding:10px;border:1px solid #bbc5d6;border-radius:8px}button{background:#2257d6;color:#fff;border:0;cursor:pointer}#status{margin-top:18px;white-space:pre-wrap}</style>
+<section><h1>CSV分割くん</h1><p>CSVを指定した行数ごとに分割して保存します。処理はこのブラウザー内で完結します。</p><label>CSVファイル</label><input id="file" type="file" accept=".csv"><label>1ファイルあたりのデータ行数</label><input id="size" type="number" min="1" value="100"><p><button id="run" disabled>分割してダウンロード</button></p><p id="status" role="status"></p></section>
+<script>
+const file=document.querySelector('#file'),size=document.querySelector('#size'),run=document.querySelector('#run'),status=document.querySelector('#status'); let selected;
+file.onchange=()=>{selected=file.files[0];run.disabled=!selected;status.textContent=selected?`${selected.name} を選択しました。`:''};
+function csvRows(text){return text.replace(/^\uFEFF/,'').split(/\r?\n/).filter((line)=>line.trim()!=='');}
+function download(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF',text],{type:'text/csv;charset=utf-8'}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
+run.onclick=async()=>{const n=Number(size.value);if(!selected||!Number.isInteger(n)||n<1){status.textContent='1以上の整数を入力してください。';return}const text=await selected.text();const rows=csvRows(text);if(rows.length<2){status.textContent='ヘッダーとデータ行が必要です。';return}const head=rows[0],data=rows.slice(1),count=Math.ceil(data.length/n),stem=selected.name.replace(/\.csv$/i,'');for(let i=0;i<count;i++)download(`${stem}_分割${String(i+1).padStart(2,'0')}.csv`,[head,...data.slice(i*n,(i+1)*n)].join('\r\n'));status.textContent=`${data.length}行を${count}ファイルに分割しました。`};
+</script>
