@@ -3,7 +3,7 @@ import { Workbook, SpreadsheetFile } from 'file:///C:/Users/User/.cache/codex-ru
 const out='C:/Users/User/OneDrive/Desktop/CSV整理くん_試作品/release/CSV整理くん.xlsx';
 const wb=Workbook.create(); const input=wb.worksheets.add('入力'); const result=wb.worksheets.add('整理結果'); const guide=wb.worksheets.add('使い方'); const settings=wb.worksheets.add('設定');
 input.getRange('A1:E6').values=[['CSV整理くん（マクロなし）','','','',''],['氏名','メールアドレス','登録日','購入金額','重複判定'],['山田 花子','hanako@example.com','2026-09-01',3000,''],['佐藤 太郎','taro@example.com','2026-08-25',1500,''],['鈴木 次郎','jiro@example.com','2026-09-05',4200,''],['佐藤 太郎','taro@example.com','2026-08-25',1500,'']];
-input.getRange('E3').formulasR1C1=[["=IF(RC[-4]=\"\",\"\",IF(COUNTIF(_xlfn.CHOOSECOLS(R3C1:R200C4,MATCH(設定!R3C2,R2C1:R2C4,0)),_xlfn.CHOOSECOLS(RC1:RC4,1,MATCH(設定!R3C2,R2C1:R2C4,0)))>1,\"重複\",\"残す\"))"]]; input.getRange('E3:E200').fillDown();
+input.getRange('E3').formulasR1C1=[["=IF(RC[-4]=\"\",\"\",IF(COUNTIF(_xlfn.CHOOSECOLS(R3C1:RC4,MATCH(設定!R3C2,R2C1:R2C4,0)),_xlfn.CHOOSECOLS(RC1:RC4,1,MATCH(設定!R3C2,R2C1:R2C4,0)))=1,\"残す\",\"重複\"))"]]; input.getRange('E3:E200').fillDown();
 input.getRange('A8').values=[['使い方：A2:D200へCSVデータを貼り付け、整理結果シートを確認してください。']];
 result.getRange('A1:D2').values=[['整理結果（サンプル）','','',''],['氏名','メールアドレス','登録日','購入金額']];
 result.getRange('A3').formulas=[["=IF(設定!B2=\"氏名\",_xlfn.SORT(_xlfn.FILTER(入力!A3:D200,入力!E3:E200=\"残す\"),1,1),IF(設定!B2=\"メールアドレス\",_xlfn.SORT(_xlfn.FILTER(入力!A3:D200,入力!E3:E200=\"残す\"),2,1),IF(設定!B2=\"購入金額\",_xlfn.SORT(_xlfn.FILTER(入力!A3:D200,入力!E3:E200=\"残す\"),4,1),_xlfn.SORT(_xlfn.FILTER(入力!A3:D200,入力!E3:E200=\"残す\"),3,1))))"]];
