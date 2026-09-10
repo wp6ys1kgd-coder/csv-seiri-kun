@@ -24,3 +24,9 @@ test("CSV output escapes commas and quotes", () => {
   const output = createCsv(["名前", "メモ"], [["山田", 'A,Bと"C"']]);
   assert.equal(output, '名前,メモ\r\n山田,"A,Bと""C"""');
 });
+
+test("duplicate detection can use one selected column", () => {
+  const result = cleanRows(["メール", "氏名"], [["a@example.com", "山田"], ["a@example.com", "山田 花子"], ["b@example.com", "佐藤"]], "", "メール");
+  assert.equal(result.duplicateCount, 1);
+  assert.deepEqual(result.rows.map((row) => row[0]), ["a@example.com", "b@example.com"]);
+});

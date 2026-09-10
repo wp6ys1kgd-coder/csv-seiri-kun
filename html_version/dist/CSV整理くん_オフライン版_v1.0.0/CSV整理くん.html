@@ -126,6 +126,10 @@ td { color: #405667; }
             <label for="sort-column">並べ替える列（任意）</label>
             <select id="sort-column" disabled><option value="">並べ替えない</option></select>
           </div>
+          <div class="field">
+            <label for="duplicate-column">重複判定する列（任意）</label>
+            <select id="duplicate-column" disabled><option value="">行全体</option></select>
+          </div>
           <button id="run-button" class="button button-primary" type="button" disabled>整理してダウンロード</button>
           <button id="reset-button" class="button button-ghost" type="button" hidden>やり直す</button>
         </div>
@@ -223,9 +227,11 @@ export function validateAndNormalize(rows) {
   return { headers, rows: dataRows };
 }
 
-export function cleanRows(headers, rows, sortColumn = "") {
+export function cleanRows(headers, rows, sortColumn = "", duplicateColumn = "") {
   const sortIndex = sortColumn ? headers.indexOf(sortColumn) : -1;
+  const duplicateIndex = duplicateColumn ? headers.indexOf(duplicateColumn) : -1;
   if (sortColumn && sortIndex < 0) throw new CsvAppError(`列「${sortColumn}」が見つかりません。`);
+  if (duplicateColumn && duplicateIndex < 0) throw new CsvAppError(`列「${duplicateColumn}」が見つかりません。`);
 
   const output = [];
   const seen = new Set();
@@ -237,7 +243,7 @@ export function cleanRows(headers, rows, sortColumn = "") {
       blankCount += 1;
       continue;
     }
-    const key = JSON.stringify(row);
+    const key = duplicateIndex >= 0 ? row[duplicateIndex] : JSON.stringify(row);
     if (seen.has(key)) {
       duplicateCount += 1;
       continue;
@@ -307,6 +313,7 @@ function initBrowserApp() {
     drop: document.querySelector("#drop-zone"),
     choose: document.querySelector("#choose-button"),
     sort: document.querySelector("#sort-column"),
+    duplicate: document.querySelector("#duplicate-column"),
     run: document.querySelector("#run-button"),
     reset: document.querySelector("#reset-button"),
     fileInfo: document.querySelector("#file-info"),
@@ -329,6 +336,8 @@ function initBrowserApp() {
     current = null;
     elements.file.value = "";
     elements.sort.replaceChildren(new Option("並べ替えない", ""));
+    elements.duplicate.replaceChildren(new Option("行全体", ""));
+    elements.duplicate.disabled = true;
     elements.sort.disabled = true;
     elements.run.disabled = true;
     elements.reset.hidden = true;
@@ -378,7 +387,9 @@ function initBrowserApp() {
 
       elements.sort.replaceChildren(new Option("並べ替えない", ""));
       current.headers.forEach((header) => elements.sort.add(new Option(header, header)));
+      current.headers.forEach((header) => elements.duplicate.add(new Option(header, header)));
       elements.sort.disabled = false;
+      elements.duplicate.disabled = false;
       elements.run.disabled = false;
       elements.reset.hidden = false;
       elements.fileInfo.hidden = false;
@@ -414,7 +425,7 @@ function initBrowserApp() {
   elements.run.addEventListener("click", () => {
     if (!current) return;
     try {
-      const cleaned = cleanRows(current.headers, current.rows, elements.sort.value);
+      const cleaned = cleanRows(current.headers, current.rows, elements.sort.value, elements.duplicate.value);
       downloadCsv(resultFilename(current.file.name), createCsv(current.headers, cleaned.rows));
       elements.previewHeading.textContent = "整理後の内容（先頭5行）";
       showPreview({ headers: current.headers, rows: cleaned.rows });
