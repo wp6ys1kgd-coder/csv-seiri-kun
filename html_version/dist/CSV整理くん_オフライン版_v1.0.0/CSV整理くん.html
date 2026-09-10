@@ -248,7 +248,14 @@ export function cleanRows(headers, rows, sortColumn = "") {
 
   if (sortIndex >= 0) {
     const collator = new Intl.Collator("ja", { sensitivity: "base" });
-    output.sort((left, right) => collator.compare(left[sortIndex], right[sortIndex]));
+    const values = output.map((row) => row[sortIndex]);
+    const numeric = values.length > 0 && values.every((value) => value === "" || /^[-+]?\d+(?:\.\d+)?$/.test(value.replaceAll(",", "")));
+    const dateLike = values.length > 0 && values.every((value) => value === "" || /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}/.test(value));
+    output.sort((left, right) => {
+      if (numeric) return (Number(left[sortIndex].replaceAll(",", "")) || 0) - (Number(right[sortIndex].replaceAll(",", "")) || 0);
+      if (dateLike) return (Date.parse(left[sortIndex]) || 0) - (Date.parse(right[sortIndex]) || 0);
+      return collator.compare(left[sortIndex], right[sortIndex]);
+    });
   }
   return { rows: output, blankCount, duplicateCount };
 }
