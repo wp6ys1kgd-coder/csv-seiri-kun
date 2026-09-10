@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CSVの空行と重複を削除し、指定列で並べ替えるオフラインツール">
+  <title>CSV整理くん</title>
+  <style>:root {
+  color-scheme: light;
+  font-family: "Yu Gothic UI", "Hiragino Kaku Gothic ProN", Meiryo, system-ui, sans-serif;
+  background: #eef3f8;
+  color: #172b3a;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: linear-gradient(145deg, #f7fafc 0%, #e6eef6 100%); }
+button, select, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .48; }
+[hidden] { display: none !important; }
+
+.shell { width: min(980px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand-mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: #0b65c2; color: white; box-shadow: 0 8px 22px rgba(11,101,194,.22); }
+.brand-mark svg { width: 27px; height: 27px; }
+h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.1rem); line-height: 1.2; letter-spacing: .02em; }
+.version { margin: 4px 0 0; color: #607589; font-size: .82rem; }
+.privacy { display: flex; align-items: center; gap: 8px; margin: 0; color: #17603a; background: #e5f6ec; border: 1px solid #bfe4cd; border-radius: 999px; padding: 8px 12px; font-size: .88rem; font-weight: 650; }
+.privacy svg { width: 17px; height: 17px; flex: 0 0 auto; }
+
+.card { background: rgba(255,255,255,.96); border: 1px solid #d7e1ea; border-radius: 20px; box-shadow: 0 18px 45px rgba(40,65,90,.10); overflow: hidden; }
+.intro { padding: 24px 28px 0; }
+.intro h2 { margin: 0 0 6px; font-size: 1.15rem; }
+.intro p { margin: 0; color: #526779; line-height: 1.65; }
+.workspace { padding: 22px 28px 28px; }
+
+.drop-zone { border: 2px dashed #9eb7cb; border-radius: 16px; background: #f7fafc; padding: 28px 22px; text-align: center; transition: .18s ease; }
+.drop-zone.is-dragging { border-color: #0b65c2; background: #eaf4ff; transform: translateY(-2px); }
+.drop-zone.has-file { border-style: solid; border-color: #8ec4a5; background: #f4fbf7; }
+.drop-icon { width: 46px; height: 46px; color: #0b65c2; margin-bottom: 7px; }
+.drop-zone strong { display: block; font-size: 1.03rem; margin-bottom: 5px; }
+.drop-zone p { margin: 0 0 15px; color: #64788a; font-size: .92rem; }
+.file-info { margin: 15px 0 0 !important; color: #24533b !important; font-weight: 650; overflow-wrap: anywhere; }
+
+.button { border: 0; border-radius: 11px; padding: 11px 17px; font-weight: 700; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; }
+.button:not(:disabled):hover { transform: translateY(-1px); }
+.button-primary { background: #0b65c2; color: white; box-shadow: 0 7px 15px rgba(11,101,194,.22); }
+.button-primary:not(:disabled):hover { background: #0955a5; }
+.button-secondary { background: white; color: #174a72; border: 1px solid #adc1d2; }
+.button-ghost { background: transparent; color: #526779; padding-inline: 8px; }
+
+.controls { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: 12px; align-items: end; margin-top: 20px; }
+.field label { display: block; font-size: .9rem; font-weight: 700; margin: 0 0 7px; }
+select { width: 100%; min-height: 44px; border: 1px solid #aebfcd; border-radius: 10px; background: white; color: #172b3a; padding: 8px 34px 8px 12px; }
+select:focus, button:focus-visible { outline: 3px solid rgba(11,101,194,.25); outline-offset: 2px; }
+
+.status { margin: 18px 0 0; border-radius: 12px; background: #edf4fb; color: #284e6d; padding: 12px 14px; line-height: 1.5; }
+.status[data-kind="success"] { background: #e8f7ee; color: #195b36; }
+.status[data-kind="error"] { background: #fff0ef; color: #922e27; }
+.result { margin-top: 14px; padding: 15px 16px; border-radius: 12px; background: #e8f7ee; border: 1px solid #bce3ca; }
+.result strong { display: block; margin-bottom: 3px; color: #144d2d; }
+.result p { margin: 0; color: #296140; line-height: 1.55; }
+
+.preview { margin-top: 22px; }
+.preview h2 { font-size: 1rem; margin: 0 0 10px; }
+.table-wrap { border: 1px solid #d6e0e8; border-radius: 12px; overflow: auto; max-height: 275px; }
+table { width: 100%; min-width: 560px; border-collapse: collapse; background: white; font-size: .9rem; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #e3eaf0; text-align: left; white-space: nowrap; }
+th { position: sticky; top: 0; background: #edf3f8; color: #29465d; font-weight: 750; }
+tbody tr:last-child td { border-bottom: 0; }
+td { color: #405667; }
+.footnote { margin: 16px 2px 0; color: #65788a; font-size: .85rem; line-height: 1.55; }
+
+@media (max-width: 680px) {
+  .shell { width: min(100% - 20px, 980px); padding-top: 16px; }
+  .topbar { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .privacy { align-self: flex-start; }
+  .intro { padding: 20px 18px 0; }
+  .workspace { padding: 18px; }
+  .drop-zone { padding: 22px 14px; }
+  .controls { grid-template-columns: 1fr; }
+  .button { width: 100%; min-height: 46px; }
+  .button-ghost { width: auto; justify-self: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM8 4v16M4 9h16M4 14h16"/></svg>
+        </span>
+        <div><h1>CSV整理くん</h1><p class="version">オフライン版 v1.0.0</p></div>
+      </div>
+      <p class="privacy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        CSVは外部へ送信されません
+      </p>
+    </header>
+
+    <section class="card" aria-labelledby="tool-heading">
+      <div class="intro">
+        <h2 id="tool-heading">CSVを選んで、整理したファイルを保存</h2>
+        <p>空行と重複行を取り除き、必要に応じて指定した列の文字順に並べ替えます。</p>
+      </div>
+
+      <div class="workspace">
+        <div id="drop-zone" class="drop-zone">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3v12m0-12 4 4m-4-4L8 7"/><path d="M5 13v6h14v-6"/></svg>
+          <strong>CSVファイルをここへドロップ</strong>
+          <p>または、ボタンからファイルを選択してください</p>
+          <button id="choose-button" class="button button-secondary" type="button">CSVを選ぶ</button>
+          <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
+          <p id="file-info" class="file-info" hidden></p>
+        </div>
+
+        <div class="controls">
+          <div class="field">
+            <label for="sort-column">並べ替える列（任意）</label>
+            <select id="sort-column" disabled><option value="">並べ替えない</option></select>
+          </div>
+          <button id="run-button" class="button button-primary" type="button" disabled>整理してダウンロード</button>
+          <button id="reset-button" class="button button-ghost" type="button" hidden>やり直す</button>
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <div id="result" class="result" aria-live="polite" hidden>
+          <strong>整理が完了しました</strong>
+          <p id="result-text"></p>
+        </div>
+
+        <section id="preview" class="preview" aria-labelledby="preview-heading" hidden>
+          <h2 id="preview-heading">読み込み内容（先頭5行）</h2>
+          <div class="table-wrap" tabindex="0" aria-label="CSVのプレビュー">
+            <table><thead id="preview-head"></thead><tbody id="preview-body"></tbody></table>
+          </div>
+        </section>
+
+        <p class="footnote">対応形式：UTF-8／Shift-JIS。元のCSVは変更しません。大切なデータは事前にバックアップしてください。</p>
+      </div>
+    </section>
+  </main>
+  <script type="module">export class CsvAppError extends Error {}
+
+export function parseCsv(text) {
+  const source = text.replace(/^\uFEFF/, "");
+  if (!source.trim()) throw new CsvAppError("CSVファイルが空です。");
+
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  let fieldStarted = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (source[index + 1] === '"') {
+          field += '"';
+          index += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"' && !fieldStarted) {
+      inQuotes = true;
+      fieldStarted = true;
+    } else if (char === ",") {
+      row.push(field);
+      field = "";
+      fieldStarted = false;
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && source[index + 1] === "\n") index += 1;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+      fieldStarted = false;
+    } else {
+      field += char;
+      fieldStarted = true;
+    }
+  }
+
+  if (inQuotes) throw new CsvAppError("ダブルクォートが閉じられていない箇所があります。");
+  if (fieldStarted || field || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+export function validateAndNormalize(rows) {
+  if (!rows.length) throw new CsvAppError("CSVファイルが空です。");
+  const headers = rows[0].map((value) => value.trim());
+  if (!headers.length || headers.some((header) => !header)) {
+    throw new CsvAppError("1行目に空の列名があります。");
+  }
+  if (new Set(headers).size !== headers.length) {
+    throw new CsvAppError("同じ列名が複数あります。");
+  }
+
+  const dataRows = rows.slice(1).map((sourceRow, rowIndex) => {
+    if (sourceRow.length > headers.length) {
+      throw new CsvAppError(`${rowIndex + 2}行目の列数が、1行目より多くなっています。`);
+    }
+    return headers.map((_, columnIndex) => (sourceRow[columnIndex] ?? "").trim());
+  });
+  return { headers, rows: dataRows };
+}
+
+export function cleanRows(headers, rows, sortColumn = "") {
+  const sortIndex = sortColumn ? headers.indexOf(sortColumn) : -1;
+  if (sortColumn && sortIndex < 0) throw new CsvAppError(`列「${sortColumn}」が見つかりません。`);
+
+  const output = [];
+  const seen = new Set();
+  let blankCount = 0;
+  let duplicateCount = 0;
+
+  for (const row of rows) {
+    if (row.every((cell) => !cell.trim())) {
+      blankCount += 1;
+      continue;
+    }
+    const key = JSON.stringify(row);
+    if (seen.has(key)) {
+      duplicateCount += 1;
+      continue;
+    }
+    seen.add(key);
+    output.push([...row]);
+  }
+
+  if (sortIndex >= 0) {
+    const collator = new Intl.Collator("ja", { sensitivity: "base" });
+    output.sort((left, right) => collator.compare(left[sortIndex], right[sortIndex]));
+  }
+  return { rows: output, blankCount, duplicateCount };
+}
+
+function escapeCsvCell(value) {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+export function createCsv(headers, rows) {
+  return [headers, ...rows]
+    .map((row) => row.map(escapeCsvCell).join(","))
+    .join("\r\n");
+}
+
+async function decodeFile(file) {
+  const buffer = await file.arrayBuffer();
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(buffer), encoding: "UTF-8" };
+  } catch {
+    try {
+      return { text: new TextDecoder("shift_jis", { fatal: true }).decode(buffer), encoding: "Shift-JIS" };
+    } catch {
+      throw new CsvAppError("文字コードを判定できません。UTF-8またはShift-JISのCSVを選んでください。");
+    }
+  }
+}
+
+function downloadCsv(filename, content) {
+  const blob = new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function resultFilename(originalName) {
+  const stem = originalName.replace(/\.csv$/i, "");
+  return `${stem}_整理済み.csv`;
+}
+
+function initBrowserApp() {
+  const elements = {
+    file: document.querySelector("#csv-file"),
+    drop: document.querySelector("#drop-zone"),
+    choose: document.querySelector("#choose-button"),
+    sort: document.querySelector("#sort-column"),
+    run: document.querySelector("#run-button"),
+    reset: document.querySelector("#reset-button"),
+    fileInfo: document.querySelector("#file-info"),
+    status: document.querySelector("#status"),
+    preview: document.querySelector("#preview"),
+    previewHeading: document.querySelector("#preview-heading"),
+    previewHead: document.querySelector("#preview-head"),
+    previewBody: document.querySelector("#preview-body"),
+    result: document.querySelector("#result"),
+    resultText: document.querySelector("#result-text"),
+  };
+  let current = null;
+
+  const setStatus = (message, kind = "info") => {
+    elements.status.textContent = message;
+    elements.status.dataset.kind = kind;
+  };
+
+  const reset = () => {
+    current = null;
+    elements.file.value = "";
+    elements.sort.replaceChildren(new Option("並べ替えない", ""));
+    elements.sort.disabled = true;
+    elements.run.disabled = true;
+    elements.reset.hidden = true;
+    elements.fileInfo.hidden = true;
+    elements.preview.hidden = true;
+    elements.previewHeading.textContent = "読み込み内容（先頭5行）";
+    elements.result.hidden = true;
+    elements.drop.classList.remove("has-file", "is-dragging");
+    setStatus("CSVファイルを選ぶところから始めましょう。");
+  };
+
+  const showPreview = ({ headers, rows }) => {
+    elements.previewHead.replaceChildren();
+    const headRow = document.createElement("tr");
+    headers.forEach((header) => {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = header;
+      headRow.append(cell);
+    });
+    elements.previewHead.append(headRow);
+
+    elements.previewBody.replaceChildren();
+    rows.slice(0, 5).forEach((row) => {
+      const bodyRow = document.createElement("tr");
+      row.forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value || "—";
+        bodyRow.append(cell);
+      });
+      elements.previewBody.append(bodyRow);
+    });
+    elements.preview.hidden = false;
+  };
+
+  const loadFile = async (file) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setStatus("CSVファイルを選んでください。", "error");
+      return;
+    }
+    try {
+      setStatus("CSVを読み込んでいます…");
+      const decoded = await decodeFile(file);
+      const normalized = validateAndNormalize(parseCsv(decoded.text));
+      current = { file, encoding: decoded.encoding, ...normalized };
+
+      elements.sort.replaceChildren(new Option("並べ替えない", ""));
+      current.headers.forEach((header) => elements.sort.add(new Option(header, header)));
+      elements.sort.disabled = false;
+      elements.run.disabled = false;
+      elements.reset.hidden = false;
+      elements.fileInfo.hidden = false;
+      elements.result.hidden = true;
+      elements.drop.classList.add("has-file");
+      elements.fileInfo.textContent = `${file.name}　｜　${current.rows.length}行　｜　${current.headers.length}列　｜　${current.encoding}`;
+      setStatus("読み込みました。必要なら並べ替える列を選び、整理を実行してください。", "success");
+      elements.previewHeading.textContent = "読み込み内容（先頭5行）";
+      showPreview(current);
+    } catch (error) {
+      current = null;
+      elements.run.disabled = true;
+      elements.sort.disabled = true;
+      elements.fileInfo.hidden = true;
+      elements.preview.hidden = true;
+      setStatus(error instanceof CsvAppError ? error.message : "CSVを読み込めませんでした。", "error");
+    }
+  };
+
+  elements.choose.addEventListener("click", () => elements.file.click());
+  elements.file.addEventListener("change", () => loadFile(elements.file.files[0]));
+  elements.reset.addEventListener("click", reset);
+  elements.drop.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    elements.drop.classList.add("is-dragging");
+  });
+  elements.drop.addEventListener("dragleave", () => elements.drop.classList.remove("is-dragging"));
+  elements.drop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    elements.drop.classList.remove("is-dragging");
+    loadFile(event.dataTransfer.files[0]);
+  });
+  elements.run.addEventListener("click", () => {
+    if (!current) return;
+    try {
+      const cleaned = cleanRows(current.headers, current.rows, elements.sort.value);
+      downloadCsv(resultFilename(current.file.name), createCsv(current.headers, cleaned.rows));
+      elements.previewHeading.textContent = "整理後の内容（先頭5行）";
+      showPreview({ headers: current.headers, rows: cleaned.rows });
+      elements.resultText.textContent = `処理前 ${current.rows.length}行 → 保存後 ${cleaned.rows.length}行｜空行 ${cleaned.blankCount}行・重複 ${cleaned.duplicateCount}行を削除`;
+      elements.result.hidden = false;
+      setStatus("整理済みCSVをダウンロードしました。元のCSVは変更されていません。", "success");
+    } catch (error) {
+      setStatus(error instanceof CsvAppError ? error.message : "整理中に問題が発生しました。", "error");
+    }
+  });
+
+  reset();
+  if (location.hash === "#demo" || location.hash === "#demo-complete") {
+    const demoCsv = [
+      "氏名,メールアドレス,登録日,購入金額",
+      "山田 花子,hanako@example.com,2026-09-01,3000",
+      "佐藤 太郎,taro@example.com,2026-08-25,1500",
+      "鈴木 次郎,jiro@example.com,2026-09-05,4200",
+      "佐藤 太郎,taro@example.com,2026-08-25,1500",
+      ",,,",
+      "高橋 美咲,misaki@example.com,2026-09-03,2800",
+    ].join("\r\n");
+    const demoFile = new File([demoCsv], "顧客リスト_サンプル.csv", { type: "text/csv" });
+    loadFile(demoFile).then(() => {
+      if (location.hash !== "#demo-complete" || !current) return;
+      elements.sort.value = "氏名";
+      const cleaned = cleanRows(current.headers, current.rows, elements.sort.value);
+      elements.previewHeading.textContent = "整理後の内容（先頭5行）";
+      showPreview({ headers: current.headers, rows: cleaned.rows });
+      elements.resultText.textContent = `処理前 ${current.rows.length}行 → 保存後 ${cleaned.rows.length}行｜空行 ${cleaned.blankCount}行・重複 ${cleaned.duplicateCount}行を削除`;
+      elements.result.hidden = false;
+      setStatus("整理済みCSVをダウンロードしました。元のCSVは変更されていません。", "success");
+    });
+  }
+}
+
+if (typeof document !== "undefined") initBrowserApp();
+</script>
+</body>
+</html>
+

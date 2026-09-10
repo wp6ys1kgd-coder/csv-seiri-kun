@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CSVの空行と重複を削除し、指定列で並べ替えるオフラインツール">
+  <title>CSV整理くん</title>
+  <style>/*__STYLES__*/</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM8 4v16M4 9h16M4 14h16"/></svg>
+        </span>
+        <div><h1>CSV整理くん</h1><p class="version">オフライン版 v1.0.0</p></div>
+      </div>
+      <p class="privacy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        CSVは外部へ送信されません
+      </p>
+    </header>
+
+    <section class="card" aria-labelledby="tool-heading">
+      <div class="intro">
+        <h2 id="tool-heading">CSVを選んで、整理したファイルを保存</h2>
+        <p>空行と重複行を取り除き、必要に応じて指定した列の文字順に並べ替えます。</p>
+      </div>
+
+      <div class="workspace">
+        <div id="drop-zone" class="drop-zone">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3v12m0-12 4 4m-4-4L8 7"/><path d="M5 13v6h14v-6"/></svg>
+          <strong>CSVファイルをここへドロップ</strong>
+          <p>または、ボタンからファイルを選択してください</p>
+          <button id="choose-button" class="button button-secondary" type="button">CSVを選ぶ</button>
+          <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
+          <p id="file-info" class="file-info" hidden></p>
+        </div>
+
+        <div class="controls">
+          <div class="field">
+            <label for="sort-column">並べ替える列（任意）</label>
+            <select id="sort-column" disabled><option value="">並べ替えない</option></select>
+          </div>
+          <button id="run-button" class="button button-primary" type="button" disabled>整理してダウンロード</button>
+          <button id="reset-button" class="button button-ghost" type="button" hidden>やり直す</button>
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <div id="result" class="result" aria-live="polite" hidden>
+          <strong>整理が完了しました</strong>
+          <p id="result-text"></p>
+        </div>
+
+        <section id="preview" class="preview" aria-labelledby="preview-heading" hidden>
+          <h2 id="preview-heading">読み込み内容（先頭5行）</h2>
+          <div class="table-wrap" tabindex="0" aria-label="CSVのプレビュー">
+            <table><thead id="preview-head"></thead><tbody id="preview-body"></tbody></table>
+          </div>
+        </section>
+
+        <p class="footnote">対応形式：UTF-8／Shift-JIS。元のCSVは変更しません。大切なデータは事前にバックアップしてください。</p>
+      </div>
+    </section>
+  </main>
+  <script type="module">//__SCRIPT__</script>
+</body>
+</html>
