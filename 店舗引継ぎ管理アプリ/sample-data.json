@@ -1,0 +1,8 @@
+[
+  {"no":"MSG-0001","date":"2026-09-01","subject":"空調設備の確認","cat":"設備","priority":"高","person":"Staff A","due":"2026-09-12","status":"未対応","content":"売場の空調を確認する。","response":"","improve":""},
+  {"no":"MSG-0002","date":"2026-09-02","subject":"備品補充","cat":"社内連絡","priority":"通常","person":"Staff B","due":"2026-09-05","status":"完了","content":"レジ袋を補充する。","response":"補充済み","improve":"毎週月曜に在庫確認"},
+  {"no":"MSG-0003","date":"2026-09-03","subject":"落とし物の保管","cat":"お客様対応","priority":"通常","person":"Staff C","due":"2026-09-10","status":"対応中","content":"受付で預かった落とし物を保管する。","response":"保管場所を記録","improve":"保管ラベルを統一"},
+  {"no":"MSG-0004","date":"2026-09-04","subject":"搬入口の点検","cat":"事故・トラブル","priority":"緊急","person":"Staff A","due":"2026-09-04","status":"完了","content":"搬入口の床面を点検する。","response":"点検完了","improve":"開店前チェックリストに追加"},
+  {"no":"MSG-0005","date":"2026-09-05","subject":"車両キーの返却","cat":"車両","priority":"低","person":"Staff B","due":"2026-09-15","status":"未対応","content":"車両キーを所定位置へ戻す。","response":"","improve":""
+  }
+]
