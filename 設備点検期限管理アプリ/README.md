@@ -17,6 +17,7 @@
 - UTF-8 BOM付きCSV出力・読込（追加／置換）
 - JSONバックアップ・復元、印刷用データ確認
 - 設定画面で事業所名、担当者一覧、分類一覧、期限警告日数を保存
+- `クラウド共有.html`でSharePoint／Power Automate、Firebase、Supabase、汎用REST APIへJSONをPOST／PUT保存・読込（接続先URL・トークン設定、最終同期表示）
 
 販売前テストの詳細は `販売前テスト結果.md` を参照してください。Chrome実機確認など未確認項目も記載しています。
 
