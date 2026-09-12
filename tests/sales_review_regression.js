@@ -1,0 +1,10 @@
+const assert=require('assert');
+const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addMonths=(value,amount)=>{const d=new Date(value+'T00:00:00'),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+amount);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return fmt(d)};
+const calcDays=(value,n)=>{const d=new Date(value+'T00:00:00');d.setDate(d.getDate()+n);return fmt(d)};
+assert.equal(addMonths('2026-01-31',1),'2026-02-28');
+assert.equal(addMonths('2024-01-31',1),'2024-02-29');
+assert.equal(addMonths('2026-01-31',2),'2026-03-31');
+assert.equal(calcDays('2026-09-12',90),'2026-12-11');
+assert.equal(addMonths('2026-09-12',2),'2026-11-12');
+console.log('sales review calculation tests: OK');
