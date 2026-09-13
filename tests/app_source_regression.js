@@ -22,4 +22,8 @@ assert.equal(equipment.run('items[0].id'),'keep');
 const store=load('店舗引継ぎ管理アプリ','app.js');
 store.run("data=[{id:'keep'}];sampleBtn.onclick()");
 assert.equal(store.run('data[0].id'),'keep');
-console.log('Actual application source regression: 9 assertions passed (mock DOM, not browser操作)');
+
+for(const [timestamp,expected]of [['2026-09-12T15:00:00Z','2026-09-13'],['2026-09-12T23:59:00Z','2026-09-13'],['2026-09-13T00:00:00Z','2026-09-13'],['2026-09-30T15:00:00Z','2026-10-01']]){
+ assert.equal(store.run("businessDate(new Date("+JSON.stringify(timestamp)+"))"),expected);
+}
+console.log('Actual app source regression: date/cycle/sample/JST boundaries PASS (mock DOM, not browser操作)');

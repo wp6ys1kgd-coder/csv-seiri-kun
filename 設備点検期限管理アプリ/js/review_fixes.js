@@ -1,6 +1,6 @@
 /* 販売前レビュー対応 */
-const localDate=(d=new Date())=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-const validDate=v=>!v||/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(new Date(v+'T00:00:00').getTime());
+const localDate=d=>d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'):new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
+const validDate=v=>window.SalesSafety?window.SalesSafety.date(v):(!v||/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(new Date(v+'T00:00:00').getTime()));
 const safeAddMonths=(value,amount)=>{if(!value||!validDate(value)||!Number.isInteger(amount)||amount<1)return'';const d=new Date(value+'T00:00:00'),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+amount);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return localDate(d)};
 const safeParseCycle=(cycle,custom='')=>{const fixed={毎月:{value:1,unit:'month'},'3か月':{value:3,unit:'month'},'6か月':{value:6,unit:'month'},'1年':{value:12,unit:'month'}}[cycle];if(fixed)return fixed;const m=String(custom).trim().match(/^(\d+)\s*(日|月|か月)$/);return m&&Number(m[1])>0?{value:Number(m[1]),unit:m[2]==='日'?'day':'month'}:null};
 const safeCalc=(date,cycle,custom='')=>{const p=safeParseCycle(cycle,custom);if(!date||!p)return'';if(p.unit==='month')return safeAddMonths(date,p.value);const d=new Date(date+'T00:00:00');d.setDate(d.getDate()+p.value);return localDate(d)};
@@ -15,7 +15,8 @@ window.reviewDateTools={localDate,safeAddMonths,safeCalc};
 
 form=(id='')=>{
   const existing=items.find(a=>a.id===id);
-  const x=existing||{cat:cats[0],cycle:'6か月',customCycle:'',history:[]};
+  const x=existing?{...existing}:{cat:cats[0],cycle:'6か月',customCycle:'',history:[]};
+  if(!cycles.includes(x.cycle)){x.cycle='任意設定';x.customCycle='';alert('旧データの周期を特定できません。任意周期を確認して入力してください。');}
   const configuredCats=(localStorage.getItem('inspection-cats')||cats.join(',')).split(',').map(v=>v.trim()).filter(Boolean);
   if(x.cat&&!configuredCats.includes(x.cat))configuredCats.push(x.cat);
   const people=(localStorage.getItem('inspection-people')||'Staff A,Staff B').split(',').map(v=>v.trim()).filter(Boolean);
@@ -23,13 +24,29 @@ form=(id='')=>{
   const [name,cat,place,person,task,prev,cycle,customCycle,next,note,customLabel,auto,saveBtn,cancelBtn,complete,completeBox,del]=['name','cat','place','person','task','prev','cycle','customCycle','next','note','customLabel','auto','saveBtn','cancelBtn','complete','completeBox','del'].map(v=>document.getElementById(v));
   const updateCustom=()=>customLabel.style.display=cycle.value==='任意設定'?'grid':'none';cycle.onchange=updateCustom;updateCustom();
   auto.onclick=()=>{const value=safeCalc(prev.value,cycle.value,customCycle.value);if(!value){alert('前回実施日と有効な周期を入力してください。任意周期は90日または2か月の形式です。');return}next.value=value};
-  const collect=()=>({id:id||crypto.randomUUID(),no:x.no||`CHK-${String(items.length+1).padStart(4,'0')}`,name:name.value.trim(),cat:cat.value,place:place.value.trim(),person:person.value.trim(),task:task.value.trim(),prev:prev.value,next:next.value,cycle:cycle.value,customCycle:cycle.value==='任意設定'?customCycle.value.trim():'',note:note.value,history:x.history||[]});
+  const collect=()=>({id:id||crypto.randomUUID(),no:x.no||(()=>{const used=new Set(items.map(v=>v.no));let n=1;while(used.has('CHK-'+String(n).padStart(4,'0')))n++;return 'CHK-'+String(n).padStart(4,'0')})(),name:name.value.trim(),cat:cat.value,place:place.value.trim(),person:person.value.trim(),task:task.value.trim(),prev:prev.value,next:next.value,cycle:cycle.value,customCycle:cycle.value==='任意設定'?customCycle.value.trim():'',note:note.value,history:x.history||[]});
   const validate=n=>{if(!n.name||!n.task){alert('対象名と点検・作業名称は必須です。');return false}if(n.cycle==='任意設定'&&!safeParseCycle(n.cycle,n.customCycle)){alert('任意周期は1以上の「日」または「か月」で入力してください。');return false}if(!validDate(n.prev)||!validDate(n.next)){alert('日付の形式が正しくありません。');return false}return true};
   saveBtn.onclick=()=>{const n=collect();if(!validate(n))return;const nextItems=id?items.map(a=>a.id===id?n:a):[...items,n];try{localStorage.setItem(KEY,JSON.stringify(nextItems));items=nextItems;show('list')}catch(e){alert('保存できませんでした。既存データは変更していません。')}};
-  cancelBtn.onclick=()=>show(id?'list':'dash');
-  complete.onclick=()=>{const draft=collect();if(!validate(draft))return;completeBox.innerHTML=`<div class="panel"><h3>点検完了内容</h3><div class="form"><label>実施日<input id="doneDate" type="date" value="${localDate()}"></label><label>担当者<input id="donePerson" value="${esc(draft.person)}"></label><label class="wide">作業内容<textarea id="doneTask">${esc(draft.task)}</textarea></label><label class="wide">不具合・問題内容<textarea id="doneIssue"></textarea></label><label class="wide">実施した対応<textarea id="doneAction"></textarea></label><label class="wide">改善策<textarea id="doneImprove"></textarea></label></div><button id="confirmDone">確認して保存</button><button id="cancelDone">キャンセル</button></div>`;cancelDone.onclick=()=>completeBox.innerHTML='';let busy=false;confirmDone.onclick=()=>{if(busy)return;const date=doneDate.value,cycleInfo=safeParseCycle(draft.cycle,draft.customCycle);if(!date||!donePerson.value.trim()||!doneTask.value.trim()||!cycleInfo){alert('実施日・担当者・作業内容・有効な周期を確認してください。');return}if(!confirm('表示内容で点検完了を保存しますか？'))return;busy=true;const record={...draft,prev:date,next:safeCalc(date,draft.cycle,draft.customCycle),history:[...(draft.history||[]),{id:crypto.randomUUID(),date,task:doneTask.value.trim(),person:donePerson.value.trim(),issue:doneIssue.value,action:doneAction.value,improve:doneImprove.value,next:safeCalc(date,draft.cycle,draft.customCycle)}]};const nextItems=id?items.map(a=>a.id===id?record:a):[...items,record];try{localStorage.setItem(KEY,JSON.stringify(nextItems));items=nextItems;show('list')}catch(e){busy=false;alert('保存できませんでした。既存データは変更していません。')}}
+  cancelBtn.onclick=()=>{if(confirm('入力中の変更を破棄しますか？'))show(id?'list':'dash')};
+  complete.onclick=()=>{
+    const draft=collect();if(!validate(draft))return;
+    completeBox.innerHTML=`<div class="panel"><h3>点検完了内容</h3><div class="form"><label>実施日<input id="doneDate" type="date" value="${localDate()}"></label><label>担当者<input id="donePerson" value="${esc(draft.person)}"></label><label class="wide">作業内容<textarea id="doneTask">${esc(draft.task)}</textarea></label><label class="wide">不具合・問題内容<textarea id="doneIssue"></textarea></label><label class="wide">実施した対応<textarea id="doneAction"></textarea></label><label class="wide">改善策<textarea id="doneImprove"></textarea></label><label class="wide">今後の注意事項<textarea id="doneCaution"></textarea></label></div><button id="confirmDone">確認して保存</button><button id="cancelDone">キャンセル</button></div>`;
+    const [doneDate,donePerson,doneTask,doneIssue,doneAction,doneImprove,doneCaution,confirmDone,cancelDone]=['doneDate','donePerson','doneTask','doneIssue','doneAction','doneImprove','doneCaution','confirmDone','cancelDone'].map(v=>document.getElementById(v));
+    cancelDone.onclick=()=>completeBox.innerHTML='';let busy=false;
+    confirmDone.onclick=()=>{
+      if(busy)return;
+      const date=doneDate.value;
+      if(!date||!validDate(date)||!donePerson.value.trim()||!doneTask.value.trim()){alert('有効な実施日・担当者・作業内容を入力してください。');return}
+      if(!confirm('表示内容で点検完了を保存しますか？'))return;
+      busy=true;confirmDone.disabled=true;
+      const nextDate=safeCalc(date,draft.cycle,draft.customCycle);
+      const record={...draft,prev:date,next:nextDate,history:[...(draft.history||[]),{id:crypto.randomUUID(),date,task:doneTask.value.trim(),person:donePerson.value.trim(),issue:doneIssue.value,action:doneAction.value,improve:doneImprove.value,caution:doneCaution.value,next:nextDate}]};
+      const nextItems=id?items.map(a=>a.id===id?record:a):[...items,record];
+      try{localStorage.setItem(KEY,JSON.stringify(nextItems));items=nextItems;show('list')}
+      catch(e){busy=false;confirmDone.disabled=false;alert('保存できませんでした。既存データは変更していません。')}
+    };
+  };
   if(id)del.onclick=()=>{if(confirm('この対象と履歴を削除しますか？')){const nextItems=items.filter(a=>a.id!==id);try{localStorage.setItem(KEY,JSON.stringify(nextItems));items=nextItems;show('list')}catch(e){alert('削除を保存できませんでした。')}}};
-};
 };
 schedule=()=>{const current=localDate().slice(0,7);app.innerHTML=`<div class="panel"><h2>点検予定</h2><label>表示月<input id="scheduleMonth" type="month" value="${current}"></label><button id="nextMonth">翌月</button><div id="scheduleRows"></div></div>`;const render=()=>scheduleRows.innerHTML=table(items.filter(x=>x.next?.startsWith(scheduleMonth.value)));scheduleMonth.onchange=render;nextMonth.onclick=()=>{scheduleMonth.value=safeAddMonths(scheduleMonth.value+'-01',1).slice(0,7);render()};render()};
 const applyOrgName=()=>{const name=localStorage.getItem('inspection-org')?.trim();document.querySelector('aside h1').textContent=name?name+'｜点検期限管理':'点検期限管理'};applyOrgName();

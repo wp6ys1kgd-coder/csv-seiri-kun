@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const S=require('../設備点検期限管理アプリ/js/data_safety.js');
+const valid={id:'a',no:'CHK-0001',name:'SAMPLE設備',cat:'設備',cycle:'任意設定',customCycle:'90日',prev:'2026-01-31',next:'2026-04-30',history:[]};
+assert.equal(S.date('2026-02-30'),false);
+assert.equal(S.date('2024-02-29'),true);
+assert.equal(S.parseJson('\uFEFF'+JSON.stringify([valid]),'equipment').items.length,1);
+assert.throws(()=>S.parseJson(JSON.stringify([{...valid,next:'2026-02-30'}]),'equipment'));
+assert.throws(()=>S.parseJson(JSON.stringify([valid,valid]),'equipment'));
+assert.throws(()=>S.parseJson(JSON.stringify([{...valid,history:[{date:'bad'}]}]),'equipment'));
+const rows=[['件名','内容'],['"引用",カンマ','改行\n次行']];
+assert.deepEqual(S.csv(S.encodeCsv(rows)),rows);
+assert.throws(()=>S.csv('a,b\n"未完了,b'));
+const values=new Map([['record','old']]);
+const storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>{if(k==='record'&&v!=='old')throw Error('QuotaExceeded');values.set(k,v)},removeItem:k=>values.delete(k)};
+assert.throws(()=>S.transaction(storage,'record',[valid]));
+assert.equal(storage.getItem('record'),'old');
+console.log('Data safety tests: 10 assertions passed');
