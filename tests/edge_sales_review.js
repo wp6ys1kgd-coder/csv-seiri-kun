@@ -6,7 +6,8 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'csv-review-edge-'));
  const server=http.createServer((req,res)=>{const file=path.join(root,decodeURIComponent(req.url.split('?')[0]));fs.createReadStream(file).on('error',()=>{res.statusCode=404;res.end()}).pipe(res)});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port,debug=19473;
- const edge=cp.spawn('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port='+debug,'--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
+ const executable=process.env.REVIEW_BROWSER||'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+ let edge=cp.spawn(executable,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port='+debug,'--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
  let socket;let seq=0;const pending=new Map();const exceptions=[];
  try{
   let targets;for(let i=0;i<100;i++){try{targets=await(await fetch('http://127.0.0.1:'+debug+'/json')).json();break}catch{await wait(100)}}
@@ -21,6 +22,33 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   await send('Page.enable');await send('Runtime.enable');
   const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result?.value};
   const navigate=async folder=>{await send('Page.navigate',{url:process.env.REVIEW_FILE_MODE?require('node:url').pathToFileURL(path.join(root,folder,'index.html')).href:'http://127.0.0.1:'+port+'/'+encodeURIComponent(folder)+'/index.html'});for(let i=0;i<60;i++){if(await evaluate('typeof window.SalesSafety === "object"'))return;await wait(100)}throw Error('App failed to load')};
+  const restart=async folder=>{
+    const handler=socket.onmessage;
+    await send('Browser.close');socket.close();
+    await wait(500);
+    edge=cp.spawn(executable,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port='+debug,'--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
+    let list;for(let i=0;i<100;i++){try{list=await(await fetch('http://127.0.0.1:'+debug+'/json')).json();if(list.some(x=>x.type==='page'))break}catch{}await wait(100)}
+    socket=new WebSocket(list.find(x=>x.type==='page').webSocketDebuggerUrl);
+    await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject});
+    socket.onmessage=handler;await send('Page.enable');await send('Runtime.enable');await navigate(folder);
+  };
+  const downloadRestore=async folder=>{
+    const location=fs.mkdtempSync(path.join(os.tmpdir(),'csv-review-download-'));
+    await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:location});
+    const expected=await evaluate("JSON.stringify(KEY==='inspection-deadline-v1'?items:data)");
+    await evaluate("backup();document.getElementById('safeJsonOut').click()");
+    const file=path.join(location,'完全バックアップ.json');for(let i=0;i<100&&!fs.existsSync(file);i++)await wait(100);
+    if(!fs.existsSync(file))throw Error('JSON download missing');
+    assert.equal(JSON.stringify(JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/, '')).items),expected);
+    await evaluate("if(KEY==='inspection-deadline-v1')items=[];else data=[];localStorage.setItem(KEY,'[]');backup()");
+    const doc=await send('DOM.getDocument'),input=await send('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'#safeJsonIn'});
+    await send('DOM.setFileInputFiles',{nodeId:input.nodeId,files:[file]});
+    for(let i=0;i<100;i++){if(await evaluate("JSON.stringify(KEY==='inspection-deadline-v1'?items:data)")===expected)break;await wait(100)}
+    assert.equal(await evaluate("JSON.stringify(KEY==='inspection-deadline-v1'?items:data)"),expected);
+    await restart(folder);
+    assert.equal(await evaluate("JSON.stringify(KEY==='inspection-deadline-v1'?items:data)"),expected);
+    console.log(folder+': disk JSON download -> clear -> real file import -> full browser restart PASS');
+  };
   const importJson=async(text)=>evaluate(`(async()=>{backup();const input=document.getElementById('safeJsonIn');const transfer=new DataTransfer();transfer.items.add(new File([${JSON.stringify(text)}],'test.json',{type:'application/json'}));input.files=transfer.files;await input.onchange({target:input});return true})()`);
   await navigate('設備点検期限管理アプリ');
   await evaluate("items=[];localStorage.setItem(KEY,'[]');form();document.getElementById('name').value='SAMPLE設備';document.getElementById('task').value='定期点検';document.getElementById('person').value='Staff A';document.getElementById('cycle').value='任意設定';document.getElementById('customCycle').value='90日';document.getElementById('prev').value='2026-09-12';document.getElementById('auto').click();document.getElementById('saveBtn').click()");
@@ -33,6 +61,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   assert.equal(await evaluate('items[0].history.length'),1);
   assert.equal(await evaluate('items[0].next'),'2026-12-14');
   await evaluate('sample.onclick()');assert.equal(await evaluate('items.length'),1);
+  await downloadRestore('設備点検期限管理アプリ');
   const saved=await evaluate('JSON.stringify(items)');
   await importJson('\uFEFF'+saved);assert.equal(await evaluate('items.length'),1);
   await importJson('[{"id":"bad"}]');assert.equal(await evaluate('JSON.stringify(items)'),saved);
@@ -46,11 +75,20 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   assert.equal(await evaluate("document.querySelector('#peopleList option').value"),'Sample Staff');
   assert.equal(await evaluate("safeStatus({next:safeCalc(localDate(),'任意設定','40日')})[0]"),'45日以内');
   assert.equal(await evaluate("document.querySelector('aside h1').textContent"),'SAMPLE事業所｜点検期限管理');
+  await evaluate("printView()");
+  await send('Emulation.setEmulatedMedia',{media:'print'});
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('aside')).display"),'none');
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.no-print')).display"),'none');
+  const equipmentPdf=await send('Page.printToPDF',{paperWidth:8.2677,paperHeight:11.6929,printBackground:true});
+  assert.ok(Buffer.from(equipmentPdf.data,'base64').length>1000);
+  if(process.env.REVIEW_CAPTURE_DIR){fs.mkdirSync(process.env.REVIEW_CAPTURE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.REVIEW_CAPTURE_DIR,'print-equipment.pdf'),Buffer.from(equipmentPdf.data,'base64'));await send('Emulation.setDeviceMetricsOverride',{width:794,height:1123,deviceScaleFactor:1,mobile:false});const capture=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(process.env.REVIEW_CAPTURE_DIR,'print-equipment.png'),Buffer.from(capture.data,'base64'));}
+  await send('Emulation.setEmulatedMedia',{media:'screen'});
   await navigate('店舗引継ぎ管理アプリ');
   await evaluate("data=[];localStorage.setItem(KEY,'[]');form();document.getElementById('subject').value='SAMPLE申し送り';document.getElementById('date').value='2026-09-13';document.getElementById('saveBtn').click()");
   assert.equal(await evaluate('data.length'),1);
   await evaluate("list();document.getElementById('q').value='見つからない';document.getElementById('q').oninput();document.getElementById('un').click();document.getElementById('clearFilter').click()");
   assert.equal(await evaluate("document.querySelectorAll('#rows tr[data-id]').length"),1);
+  await downloadRestore('店舗引継ぎ管理アプリ');
   const storeSaved=await evaluate('JSON.stringify(data)');await importJson('\uFEFF'+storeSaved);assert.equal(await evaluate('data.length'),1);
   await importJson('invalid');assert.equal(await evaluate('JSON.stringify(data)'),storeSaved);
 
@@ -71,7 +109,13 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   await wait(200);assert.equal(await evaluate("document.getElementById('printBtn').disabled"),true);
   await send('Page.navigate',{url:(process.env.REVIEW_FILE_MODE?require('node:url').pathToFileURL(path.join(root,'店舗引継ぎ管理アプリ','印刷用テンプレート.html')).href:'http://127.0.0.1:'+port+'/'+encodeURIComponent('店舗引継ぎ管理アプリ')+'/'+encodeURIComponent('印刷用テンプレート.html'))+'?id='+encodeURIComponent(printId)});
   await wait(200);assert.equal(await evaluate("document.getElementById('printBtn').disabled"),false);
+  await send('Emulation.setEmulatedMedia',{media:'print'});
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.actions')).display"),'none');
+  const pdf=await send('Page.printToPDF',{paperWidth:8.2677,paperHeight:11.6929,printBackground:true,preferCSSPageSize:true});
+  const pdfBuffer=Buffer.from(pdf.data,'base64');assert.ok(pdfBuffer.length>1000);assert.equal(pdfBuffer.subarray(0,4).toString(),'%PDF');
+  if(process.env.REVIEW_CAPTURE_DIR){fs.mkdirSync(process.env.REVIEW_CAPTURE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.REVIEW_CAPTURE_DIR,'print-check.pdf'),pdfBuffer);await send('Emulation.setDeviceMetricsOverride',{width:794,height:1123,deviceScaleFactor:1,mobile:false});const capture=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(process.env.REVIEW_CAPTURE_DIR,'print-check.png'),Buffer.from(capture.data,'base64'));}
+  console.log('A4 print PDF generation and hidden controls PASS (not physical printer or visual preview)');
   assert.deepEqual(exceptions,[]);
-  console.log('Edge DOM operation tests: registration/custom cycle/completion/cancel/sample protection/JSON/filters/month selection PASS');
+  console.log('Browser DOM operation tests: registration/custom cycle/completion/cancel/sample protection/JSON/filters/month selection PASS');
  }finally{if(socket)socket.close();edge.kill();server.close();console.log('Disposable profile: '+profile)}
 })().catch(e=>{console.error(e);process.exitCode=1});
